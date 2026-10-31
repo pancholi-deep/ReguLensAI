@@ -148,3 +148,27 @@ Render can automatically redeploy services when changes are merged or pushed to 
 ## Disclaimer
 
 This prototype is not certified for regulatory compliance. Regulatory interpretations and AI-generated recommendations require qualified human review.
+
+## L2 — Internal repository and change impact
+
+The L2 workflow extends regulatory extraction into organisation-level impact analysis:
+
+- **Internal repository:** user-scoped policies, procedures, controls, systems, processes and standards, with department, accountable owner, system and criticality metadata. Text can be entered directly; binary internal-document storage and parsing are not part of this increment.
+- **Obligation mapping:** run an assessment against the obligations extracted from a saved regulatory document. The initial matcher uses deterministic token overlap against internal asset names, descriptions and content; it stores the best relevant match, score, rationale and source evidence.
+- **Gap assessment:** each obligation is classified as Addressed, Partially addressed, Not addressed or Unassessable. Reviewers can change the suggested status and confirm the mapping.
+- **Recommendations:** partially addressed, unaddressed and unassessable obligations receive a proposed next step and draft control wording. Recommendations remain pending review until a human approves or rejects them.
+- **Impact and remediation:** assessment results provide obligation-level impact visibility; reviewers can create remediation actions with owner, department, due date and priority, then track Open, In progress, Blocked, Completed or Cancelled status.
+- **Audit trail:** assessment creation, mapping reviews and remediation changes are recorded as assessment events. All L2 records are scoped to the signed-in user.
+- **No extra infrastructure:** PostgreSQL remains the system of record; the first matcher is deterministic and does not require a vector database or a separate worker.
+
+### L2 workflow
+
+1. Sign in and open **Internal Repository**. Add the organisation's relevant policies, SOPs, controls and systems, including meaningful text and ownership metadata.
+2. Open **Impact Assessments**, select a saved regulatory document and run an assessment.
+3. Inspect each obligation, source excerpt, suggested internal match and gap status. Correct the mapping/status where needed.
+4. Review the generated recommendation and draft wording; approve only after an accountable reviewer validates it.
+5. Create a remediation action, assign an owner and due date, and track progress in **Actions**.
+
+**Important limitation:** the first matcher is a transparent keyword-overlap baseline, not semantic retrieval or a compliance certification. Similar wording can produce false positives, and different wording can hide a relevant control. Match scores are triage signals, not calibrated probabilities. Human reviewers must verify the internal evidence, control operation and legal interpretation. Internal asset text is currently entered through the UI; document upload, OCR, embeddings, richer multi-asset mapping and notifications are future enhancements.
+
+New migration: `0006_l2_impact_management`. Render's API startup applies Alembic migrations when `DATABASE_URL` is configured.
