@@ -584,3 +584,8 @@ td small { color: #75849a; font-size: 12.5px; }
   .impact-gap-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .impact-action { grid-template-columns:1fr; }
 }
+
+
+.impact-manual-match { display:grid; grid-template-columns:minmax(0,220px) minmax(180px,1fr); align-items:center; gap:10px; margin:10px 0; color:#7e8b9c; font-size:10px; font-weight:600; }
+.impact-manual-match select { min-width:0; border:1px solid #dfe6ee; border-radius:7px; padding:8px 9px; color:#40546c; background:#fff; font:inherit; font-size:11px; }
+@media(max-width:600px) { .impact-manual-match { grid-template-columns:1fr; } }
