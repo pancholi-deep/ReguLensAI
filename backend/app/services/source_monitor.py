@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
-import json
 import logging
 import os
 import socket
 import threading
-import time
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import PurePosixPath
@@ -178,10 +176,11 @@ def _is_document_url(url: str) -> bool:
 def _is_detail_url(url: str) -> bool:
     parts = urlsplit(url)
     query = {key.lower(): value for key, value in parse_qs(parts.query).items()}
-    return (
-        PurePosixPath(parts.path.lower()).suffix in {".aspx", ".html", ".htm"}
-        and any(key in query for key in {"id", "prid", "documentid", "docid"})
-    )
+    suffix = PurePosixPath(parts.path.lower()).suffix
+    # Regulator pages commonly expose document records via query-string IDs,
+    # including extensionless routes such as /notice?id=123.
+    return bool(parts.path and any(key in query for key in {"id", "prid", "documentid", "docid"})
+                and suffix not in ALLOWED_EXTENSIONS)
 
 
 def _filename_from_response(url: str, headers: dict[str, str]) -> str:
