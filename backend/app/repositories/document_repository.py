@@ -90,6 +90,7 @@ def persist_analysis(
         document_type=str(extraction.get("metadata", {}).get("document_type") or "Regulatory publication")[:120],
         business_areas=[str(publication_data.get("area") or "General regulatory")],
         status=str(publication_data.get("status") or "Awaiting review")[:80],
+        source_url=str(publication_data.get("source_url") or "")[:2000] or None,
     )
     session.add(publication)
     session.flush()
@@ -229,6 +230,7 @@ def publication_to_dict(publication: Publication, authority_name: str | None = N
         "status": publication.status,
         "kind": publication.document_type or "Regulatory publication",
         "reference_number": publication.reference_number,
+        "source_url": publication.source_url,
     }
 
 
