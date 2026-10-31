@@ -14,6 +14,7 @@ from starlette.concurrency import run_in_threadpool
 from app.data.demo_data import CHANGES, PUBLICATIONS, SOURCES
 from app.core.config import gemini_configuration
 from app.api.auth_routes import router as auth_router
+from app.api.impact_routes import router as impact_router
 from app.db.models import User, MonitoredSource
 from app.services.auth import auth_configuration, get_current_user, get_optional_user, require_browser_request
 from app.db.models import ChangeFinding, DocumentComparison, DocumentVersion, Publication, RegulatoryAuthority
@@ -46,6 +47,7 @@ from app.services.document_ingestion import (
 
 router = APIRouter(prefix="/api/v1", tags=["Regulatory intelligence"])
 router.include_router(auth_router)
+router.include_router(impact_router)
 
 def _comparison_for_duplicate(
     session: Session, document_version_id: str, owner_user_id: str
