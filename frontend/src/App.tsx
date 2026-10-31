@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity, AlertTriangle, CheckCircle2, ChevronRight, FileText,
+  Activity, AlertTriangle, CheckCircle2, ChevronRight, FileText, Globe,
   LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, RefreshCw,
   ShieldCheck, UploadCloud, type LucideIcon,
 } from "lucide-react";
@@ -8,8 +8,9 @@ import { api, type AuthUser } from "./api";
 import type { ChangeItem, DocumentAnalysis, DocumentRecord } from "./types";
 import DocumentIntake from "./DocumentIntake";
 import GoogleSignInButton from "./GoogleSignInButton";
+import SourceMonitor from "./SourceMonitor";
 
-type Page = "Dashboard" | "Documents";
+type Page = "Dashboard" | "Documents" | "Sources";
 type DashboardFilter = "actions" | "documents" | "compliant";
 type FindingSeverity = "high" | "medium" | "low";
 type RiskTone = "red" | "yellow" | "green";
@@ -193,6 +194,10 @@ export default function App() {
           <UploadCloud size={18} />{!sidebarCollapsed && <span>Documents</span>}
           {page === "Documents" && !sidebarCollapsed && <ChevronRight size={15} className="nav-chevron" />}
         </button>
+        <button className={"nav-item " + (page === "Sources" ? "active" : "")} onClick={() => setPage("Sources")} title={sidebarCollapsed ? "Sources" : undefined}>
+          <Globe size={18} />{!sidebarCollapsed && <span>Sources</span>}
+          {page === "Sources" && !sidebarCollapsed && <ChevronRight size={15} className="nav-chevron" />}
+        </button>
       </nav>
       <div className="sidebar-bottom simple-sidebar-bottom">
         <div className="user-row">
@@ -302,6 +307,8 @@ export default function App() {
                 })}</div>}
           </section>
         </>}
+
+        {page === "Sources" && <SourceMonitor onCrawlComplete={() => void loadWorkspace(false)} />}
 
         {page === "Documents" && <>
           <div className="simple-page-heading">
