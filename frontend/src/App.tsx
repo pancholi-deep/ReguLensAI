@@ -10,7 +10,7 @@ import DocumentIntake from "./DocumentIntake";
 import GoogleSignInButton from "./GoogleSignInButton";
 
 type Page = "Dashboard" | "Documents";
-type DashboardFilter = "actions" | "documents" | "high-risk" | "compliant";
+type DashboardFilter = "actions" | "documents" | "compliant";
 type RiskTone = "red" | "yellow" | "green";
 
 function getSeverity(item: ChangeItem): "high" | "medium" | "low" {
@@ -140,20 +140,12 @@ export default function App() {
     () => findings.filter((item) => item.compliance_status !== "compliant"),
     [findings],
   );
-  const highRiskCount = openActions.filter(
-    (item) => getRiskTone(item) === "red",
-  ).length;
   const compliantCount = findings.filter(
     (item) => item.compliance_status === "compliant",
   ).length;
   const needsReviewCount = openActions.length;
   const compliantFindings = findings.filter((item) => item.compliance_status === "compliant");
-  const highRiskFindings = openActions.filter((item) => getRiskTone(item) === "red");
-  const visibleFindings = activeFilter === "high-risk"
-    ? highRiskFindings
-    : activeFilter === "compliant"
-      ? compliantFindings
-      : openActions;
+  const visibleFindings = activeFilter === "compliant" ? compliantFindings : openActions;
 
   if (!authReady) {
     return <main className="login-screen"><div className="login-card"><div className="login-mark"><ShieldCheck size={25} /></div><strong>ReguLens<span>AI</span></strong><p>Checking your secure session…</p><div className="login-spinner" /></div></main>;
@@ -230,8 +222,6 @@ export default function App() {
           <section className="simple-metric-grid" aria-label="Dashboard filters">
             <Metric label="Documents uploaded" value={documentCount} caption="View saved documents" tone="blue" icon={FileText}
               selected={activeFilter === "documents"} onClick={() => setActiveFilter("documents")} />
-            <Metric label="High-risk findings" value={highRiskCount} caption="High severity + confidence ≥ 70%" tone="red" icon={AlertTriangle}
-              selected={activeFilter === "high-risk"} onClick={() => setActiveFilter("high-risk")} />
             <Metric label="Actions to review" value={needsReviewCount} caption="Open or in progress" tone="yellow" icon={Activity}
               selected={activeFilter === "actions"} onClick={() => setActiveFilter("actions")} />
             <Metric label="Marked compliant" value={compliantCount} caption="Confirmed by your team" tone="green" icon={CheckCircle2}
@@ -241,8 +231,8 @@ export default function App() {
           <section className="simple-section dashboard-results">
             <div className="simple-section-header">
               <div>
-                <h2>{activeFilter === "documents" ? "Uploaded documents" : activeFilter === "high-risk" ? "High-risk findings" : activeFilter === "compliant" ? "Marked compliant" : "Actions to review"}</h2>
-                <p>{activeFilter === "documents" ? "Your saved document history." : activeFilter === "high-risk" ? "High-severity findings with confidence of at least 70%." : activeFilter === "compliant" ? "Items your team has explicitly marked compliant." : "Prioritized items that still need attention."}</p>
+                <h2>{activeFilter === "documents" ? "Uploaded documents" : activeFilter === "compliant" ? "Marked compliant" : "Actions to review"}</h2>
+                <p>{activeFilter === "documents" ? "Your saved document history." : activeFilter === "compliant" ? "Items your team has explicitly marked compliant." : "Prioritized items that still need attention."}</p>
               </div>
               <span>{activeFilter === "documents" ? `${documentCount} documents` : `${visibleFindings.length} items`}</span>
             </div>
@@ -258,7 +248,7 @@ export default function App() {
               : visibleFindings.length === 0 ? (
                 <div className="simple-empty">
                   <ShieldCheck size={22} />
-                  <strong>{activeFilter === "compliant" ? "No items marked compliant" : activeFilter === "high-risk" ? "No high-risk findings" : "Nothing to review"}</strong>
+                  <strong>{activeFilter === "compliant" ? "No items marked compliant" : "Nothing to review"}</strong>
                   <span>{activeFilter === "actions" ? "Upload a circular to generate recommended actions." : "Your results will appear here when available."}</span>
                 </div>
               ) : <div className="simple-action-list">{visibleFindings.slice().sort((a, b) => {
