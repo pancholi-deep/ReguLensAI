@@ -10,6 +10,7 @@ import DocumentIntake from "./DocumentIntake";
 import GoogleSignInButton from "./GoogleSignInButton";
 
 type Page = "Dashboard" | "Documents";
+type DashboardFilter = "actions" | "documents" | "high-risk" | "compliant";
 type RiskTone = "red" | "yellow" | "green";
 
 function getSeverity(item: ChangeItem): "high" | "medium" | "low" {
@@ -38,13 +39,15 @@ function formatDate(value?: string | null): string {
   return Number.isNaN(parsed.getTime()) ? "Date unavailable" : parsed.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
-function Metric({ label, value, caption, tone, icon: Icon }: {
+function Metric({ label, value, caption, tone, icon: Icon, selected, onClick }: {
   label: string; value: number; caption: string; tone: RiskTone | "blue"; icon: LucideIcon;
+  selected: boolean; onClick: () => void;
 }) {
-  return <article className="simple-metric">
-    <div className="simple-metric-top"><span>{label}</span><span className={`simple-metric-icon ${tone}`}><Icon size={17} /></span></div>
+  return <button type="button" className={`simple-metric ${selected ? "selected" : ""}`}
+    aria-pressed={selected} onClick={onClick}>
+    <span className="simple-metric-top"><span>{label}</span><span className={`simple-metric-icon ${tone}`}><Icon size={17} /></span></span>
     <strong>{value}</strong><small>{caption}</small>
-  </article>;
+  </button>;
 }
 
 export default function App() {
@@ -52,6 +55,7 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState("");
   const [page, setPage] = useState<Page>("Dashboard");
+  const [activeFilter, setActiveFilter] = useState<DashboardFilter>("actions");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [documentCount, setDocumentCount] = useState(0);
@@ -143,7 +147,13 @@ export default function App() {
     (item) => item.compliance_status === "compliant",
   ).length;
   const needsReviewCount = openActions.length;
-  const recentDocuments = documents.slice(0, 6);
+  const compliantFindings = findings.filter((item) => item.compliance_status === "compliant");
+  const highRiskFindings = openActions.filter((item) => getRiskTone(item) === "red");
+  const visibleFindings = activeFilter === "high-risk"
+    ? highRiskFindings
+    : activeFilter === "compliant"
+      ? compliantFindings
+      : openActions;
 
   if (!authReady) {
     return <main className="login-screen"><div className="login-card"><div className="login-mark"><ShieldCheck size={25} /></div><strong>ReguLens<span>AI</span></strong><p>Checking your secure session…</p><div className="login-spinner" /></div></main>;
@@ -217,53 +227,63 @@ export default function App() {
             <button className="button primary" onClick={() => setPage("Documents")}><UploadCloud size={15} /> Upload document</button>
           </div>
 
-          <section className="simple-metric-grid">
-            <Metric label="Documents uploaded" value={documentCount} caption="Saved to your workspace" tone="blue" icon={FileText} />
-            <Metric label="High-risk findings" value={highRiskCount} caption="High severity + confidence ≥ 70%" tone="red" icon={AlertTriangle} />
-            <Metric label="Actions to review" value={needsReviewCount} caption="Open or in progress" tone="yellow" icon={Activity} />
-            <Metric label="Marked compliant" value={compliantCount} caption="Confirmed by your team" tone="green" icon={CheckCircle2} />
+          <section className="simple-metric-grid" aria-label="Dashboard filters">
+            <Metric label="Documents uploaded" value={documentCount} caption="View saved documents" tone="blue" icon={FileText}
+              selected={activeFilter === "documents"} onClick={() => setActiveFilter("documents")} />
+            <Metric label="High-risk findings" value={highRiskCount} caption="High severity + confidence ≥ 70%" tone="red" icon={AlertTriangle}
+              selected={activeFilter === "high-risk"} onClick={() => setActiveFilter("high-risk")} />
+            <Metric label="Actions to review" value={needsReviewCount} caption="Open or in progress" tone="yellow" icon={Activity}
+              selected={activeFilter === "actions"} onClick={() => setActiveFilter("actions")} />
+            <Metric label="Marked compliant" value={compliantCount} caption="Confirmed by your team" tone="green" icon={CheckCircle2}
+              selected={activeFilter === "compliant"} onClick={() => setActiveFilter("compliant")} />
           </section>
 
-          <section className="simple-section">
-            <div className="simple-section-header"><div><h2>Recommended actions</h2><p>Prioritized by severity and confidence.</p></div><span>{openActions.length} open</span></div>
-            {workspaceBusy ? <div className="simple-empty">Loading findings…</div>
-              : openActions.length === 0 && findings.length === 0
-                ? <div className="simple-empty"><ShieldCheck size={22} /><strong>No findings yet</strong><span>Upload a circular to generate recommended actions.</span></div>
-                : <div className="simple-action-list">{findings.slice().sort((a, b) => {
-                    const rank = (item: ChangeItem) => item.compliance_status === "compliant" ? 3 : getRiskTone(item) === "red" ? 0 : 1;
-                    return rank(a) - rank(b) || (b.confidence ?? 0) - (a.confidence ?? 0);
-                  }).slice(0, 8).map((item) => {
-                    const tone = getRiskTone(item);
-                    const actionText = item.actions?.[0] ?? item.impact ?? "Review the updated regulatory requirement.";
-                    return <article className={`simple-action-card ${tone}`} key={item.id}>
-                      <div className="simple-action-main">
-                        <span className={`risk-chip ${tone}`}>{riskLabel(item)}</span>
-                        <h3>{item.publication}</h3>
-                        <p>{actionText}</p>
-                        <div className="simple-action-meta">
-                          <span>{item.classification}</span><span>{getSeverity(item)} severity</span>
-                          <span>Confidence: {item.confidence == null ? "Not scored" : `${Math.round(item.confidence * 100)}%`}</span>
-                        </div>
+          <section className="simple-section dashboard-results">
+            <div className="simple-section-header">
+              <div>
+                <h2>{activeFilter === "documents" ? "Uploaded documents" : activeFilter === "high-risk" ? "High-risk findings" : activeFilter === "compliant" ? "Marked compliant" : "Actions to review"}</h2>
+                <p>{activeFilter === "documents" ? "Your saved document history." : activeFilter === "high-risk" ? "High-severity findings with confidence of at least 70%." : activeFilter === "compliant" ? "Items your team has explicitly marked compliant." : "Prioritized items that still need attention."}</p>
+              </div>
+              <span>{activeFilter === "documents" ? `${documentCount} documents` : `${visibleFindings.length} items`}</span>
+            </div>
+            {activeFilter === "documents" ? (
+              workspaceBusy ? <div className="simple-empty">Loading documents…</div>
+                : documents.length === 0 ? <div className="simple-empty"><FileText size={22} /><strong>No documents uploaded</strong><span>Upload a circular to build your repository.</span></div>
+                  : <div className="simple-upload-list">{documents.map((item) => <div className="simple-upload-row" key={item.document_version_id}>
+                      <span className="simple-file-icon"><FileText size={17} /></span>
+                      <div><strong>{item.publication.title}</strong><small>{item.filename}</small></div>
+                      <time>{formatDate(item.created_at)}</time>
+                    </div>)}</div>
+            ) : workspaceBusy ? <div className="simple-empty">Loading findings…</div>
+              : visibleFindings.length === 0 ? (
+                <div className="simple-empty">
+                  <ShieldCheck size={22} />
+                  <strong>{activeFilter === "compliant" ? "No items marked compliant" : activeFilter === "high-risk" ? "No high-risk findings" : "Nothing to review"}</strong>
+                  <span>{activeFilter === "actions" ? "Upload a circular to generate recommended actions." : "Your results will appear here when available."}</span>
+                </div>
+              ) : <div className="simple-action-list">{visibleFindings.slice().sort((a, b) => {
+                  const rank = (item: ChangeItem) => item.compliance_status === "compliant" ? 3 : getRiskTone(item) === "red" ? 0 : 1;
+                  return rank(a) - rank(b) || (b.confidence ?? 0) - (a.confidence ?? 0);
+                }).map((item) => {
+                  const tone = getRiskTone(item);
+                  const actionText = item.actions?.[0] ?? item.impact ?? "Review the updated regulatory requirement.";
+                  return <article className={`simple-action-card ${tone}`} key={item.id}>
+                    <div className="simple-action-main">
+                      <span className={`risk-chip ${tone}`}>{riskLabel(item)}</span>
+                      <h3>{item.publication}</h3>
+                      <p>{actionText}</p>
+                      <div className="simple-action-meta">
+                        <span>{item.classification}</span><span>{getSeverity(item)} severity</span>
+                        <span>Confidence: {item.confidence == null ? "Not scored" : `${Math.round(item.confidence * 100)}%`}</span>
                       </div>
-                      <button className={`compliance-toggle ${item.compliance_status === "compliant" ? "is-compliant" : ""}`}
-                        disabled={updatingFinding === item.id}
-                        onClick={() => void handleComplianceStatus(item)}>
-                        {updatingFinding === item.id ? "Saving…" : item.compliance_status === "compliant" ? "Reopen" : "Mark compliant"}
-                      </button>
-                    </article>;
-                  })}
-                  {findings.length > 8 && <div className="simple-list-foot">Showing 8 of {findings.length} findings.</div>}
-                </div>}
-          </section>
-
-          <section className="simple-section uploads-section">
-            <div className="simple-section-header"><div><h2>Recent uploads</h2><p>Upload audit for your account.</p></div><button className="text-button" onClick={() => setPage("Documents")}>View documents <ChevronRight size={14} /></button></div>
-            {recentDocuments.length === 0 ? <div className="simple-empty compact-empty">No documents uploaded yet.</div>
-              : <div className="simple-upload-list">{recentDocuments.map((item) => <div className="simple-upload-row" key={item.document_version_id}>
-                  <span className="simple-file-icon"><FileText size={17} /></span>
-                  <div><strong>{item.publication.title}</strong><small>{item.filename}</small></div>
-                  <time>{formatDate(item.created_at)}</time>
-                </div>)}</div>}
+                    </div>
+                    <button className={`compliance-toggle ${item.compliance_status === "compliant" ? "is-compliant" : ""}`}
+                      disabled={updatingFinding === item.id}
+                      onClick={() => void handleComplianceStatus(item)}>
+                      {updatingFinding === item.id ? "Saving…" : item.compliance_status === "compliant" ? "Reopen" : "Mark compliant"}
+                    </button>
+                  </article>;
+                })}</div>}
           </section>
         </>}
 
