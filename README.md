@@ -102,7 +102,7 @@ The database stores extracted text, metadata, source sections, obligations and t
 
 ## Regulatory source monitoring
 
-- The signed-in **Sources** workspace can add the RBI Notifications page and additional public HTTP(S) source URLs.
+- The signed-in **Sources** workspace can add RBI Notifications from the RBI-published `https://www.rbi.org.in/notifications_rss.xml` feed and additional public HTTP(S) source URLs. Older RBI monitors saved against the HTML listing page are upgraded to the RSS endpoint on their next crawl.
 - RBI uses the official Notifications listing at `https://www.rbi.org.in/Scripts/NotificationUser.aspx`. The crawler follows notification detail pages, downloads linked PDF/DOCX/TXT files, detects new or changed file bytes by SHA-256, and submits changed documents to the same extraction and historical-comparison pipeline as manual uploads.
 - Custom sources can be configured independently per user. Polling intervals are configurable from 15 minutes to 24 hours; sources can be paused, checked on demand or removed.
 - The API scheduler runs when `SOURCE_CRAWLER_ENABLED=true` (enabled in the Render Blueprint) and checks sources according to each saved interval. For deployments with multiple API replicas, run a single crawler-enabled replica until a distributed scheduler/lock is introduced.
