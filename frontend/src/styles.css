@@ -303,7 +303,7 @@ td small { color: #75849a; font-size: 12.5px; }
 .simple-page-heading p { margin: 0; color: #8996a8; font-size: 13px; }
 .button.primary { background: #275783; color: #fff; }
 .button.primary:hover:not(:disabled) { background: #1e496f; }
-.simple-metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; margin-bottom: 19px; }
+.simple-metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; margin-bottom: 19px; }
 .simple-metric { min-width: 0; padding: 16px 17px; border: 1px solid #e5ebf2; border-radius: 12px; background: #fff; }
 .simple-metric-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #78869a; font-size: 12px; font-weight: 600; }
 .simple-metric-icon { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 9px; }
