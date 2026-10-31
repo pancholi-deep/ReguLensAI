@@ -158,7 +158,12 @@ export default function ImpactWorkspace({ mode }: { mode: Mode }) {
         {(selectedAssessment.mappings ?? []).map(mapping=><article className="impact-mapping" key={mapping.id}>
           <div className="impact-mapping-head"><span className="eyebrow">OBLIGATION · {mapping.source_reference}</span><select value={mapping.gap_status} onChange={e=>void updateMapping(mapping,e.target.value)}><option value="addressed">Addressed</option><option value="partially_addressed">Partially addressed</option><option value="not_addressed">Not addressed</option><option value="unassessable">Unassessable</option></select></div>
           <p className="impact-requirement">{mapping.requirement}</p><blockquote className="evidence-quote">“{mapping.source_excerpt}”</blockquote>
-          <div className="impact-match-detail"><span>Internal match: {mapping.asset?.name ?? "No matching internal asset"}</span><span>Text similarity: {(mapping.match_score*100).toFixed(0)}%</span><span>{mapping.evidence_verified ? "Source evidence matched" : "Source evidence needs review"}</span></div>
+          <div className="impact-match-detail"><span>Suggested match: {mapping.asset?.name ?? "No matching internal asset"}</span><span>Text similarity: {(mapping.match_score*100).toFixed(0)}%</span><span>{mapping.evidence_verified ? "Source evidence matched" : "Source evidence needs review"}</span></div>
+          <label className="impact-manual-match">Confirm / change internal evidence
+            <select value={mapping.asset?.id ?? ""} onChange={e=>void api.reviewImpactMapping(mapping.id,{gap_status:mapping.gap_status,internal_asset_id:e.target.value}).then(async()=>{if(selectedAssessment)setSelectedAssessment(await api.impactAssessment(selectedAssessment.id));}).catch(err=>setError(err instanceof Error?err.message:"Unable to update evidence mapping."))}>
+              <option value="">No linked asset</option>{assets.map(asset=><option key={asset.id} value={asset.id}>{asset.name} · {asset.asset_type}</option>)}
+            </select>
+          </label>
           <p className="muted">{mapping.rationale}</p>
           {mapping.recommendation && <div className="impact-recommendation"><div><strong>Recommendation · {mapping.recommendation.priority} priority</strong><p>{mapping.recommendation.recommendation}</p><pre>{mapping.recommendation.draft_wording}</pre><small>Status: {mapping.recommendation.status.replace(/_/g," ")}</small></div>
             {mapping.recommendation.status==="pending_review" && <button className="button secondary" onClick={()=>void approveRecommendation(mapping)}>Approve recommendation</button>}</div>}
