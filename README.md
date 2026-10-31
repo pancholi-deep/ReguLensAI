@@ -100,6 +100,15 @@ Tests use isolated SQLite databases and mock Gemini requests. CI applies all Ale
 
 The database stores extracted text, metadata, source sections, obligations and the structured extraction result. **The original uploaded binary is not retained in this milestone**; object storage and download/retention policies are a later step. Do not upload confidential customer or production documents.
 
+## Regulatory source monitoring
+
+- The signed-in **Sources** workspace can add the RBI Notifications page and additional public HTTP(S) source URLs.
+- RBI uses the official Notifications listing at `https://www.rbi.org.in/Scripts/NotificationUser.aspx`. The crawler follows notification detail pages, downloads linked PDF/DOCX/TXT files, detects new or changed file bytes by SHA-256, and submits changed documents to the same extraction and historical-comparison pipeline as manual uploads.
+- Custom sources can be configured independently per user. Polling intervals are configurable from 15 minutes to 24 hours; sources can be paused, checked on demand or removed.
+- The API scheduler runs when `SOURCE_CRAWLER_ENABLED=true` (enabled in the Render Blueprint) and checks sources according to each saved interval. For deployments with multiple API replicas, run a single crawler-enabled replica until a distributed scheduler/lock is introduced.
+- Source URLs are validated as public HTTP(S) addresses; local, private, reserved IP addresses and non-standard ports are rejected. Crawl frequency and document size are bounded.
+- A first crawl ingests up to 12 linked documents per source to seed the per-user repository. Subsequent crawls ingest changed files only. Findings are decision support and require human review.
+
 ## Render deployment
 
 The repository is now consolidated on `main`. Use that branch as the deployment source.
@@ -115,7 +124,7 @@ The repository is now consolidated on `main`. Use that branch as the deployment 
 6. In the frontend static site, set `VITE_API_BASE_URL` to the API origin, e.g. `https://regulens-ai-api.onrender.com`, and `VITE_GOOGLE_CLIENT_ID` to the same Google OAuth Web client ID. Redeploy the frontend after changing these values because Vite embeds them at build time.
 7. In Google Cloud Console, configure the OAuth consent screen and add the exact frontend origin (for example, `https://regulens-ai-frontend.onrender.com`) under **Authorized JavaScript origins**. Add local development origins such as `http://localhost:5173` only when needed. This app uses Google Identity Services ID-token credentials; it does not require a Google client secret.
 8. The API start command runs `alembic upgrade head` when `DATABASE_URL` is configured, then starts FastAPI. Migration `0003_user_ownership_auth` creates the users table and adds nullable ownership to document versions. Existing pre-authentication records remain unowned and are intentionally not exposed to new accounts.
-9. Keep `APP_ENV=production`. FastAPI verifies the Google ID token, creates an application session in a Secure, HttpOnly cookie, and requires that session for document APIs. Document listing, duplicate detection and historical comparison are scoped to the authenticated user's ID. Public demo data remains readable without sign-in.
+9. Set `SOURCE_CRAWLER_ENABLED=true` on one API instance to enable scheduled source polling. The Render Blueprint sets this for the single API service. Keep `APP_ENV=production`. FastAPI verifies the Google ID token, creates an application session in a Secure, HttpOnly cookie, and requires that session for document APIs. Document listing, duplicate detection and historical comparison are scoped to the authenticated user's ID. Public demo data remains readable without sign-in.
 
 The Blueprint intentionally does not create a database automatically, so you choose the database provider and pricing. Render's Free Postgres currently expires 30 days after creation and is limited to 1 GB; use it only for disposable testing, not durable project data. See [Render's Free instance limitations](https://render.com/docs/free).
 
