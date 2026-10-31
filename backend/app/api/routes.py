@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from copy import deepcopy
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
@@ -13,7 +14,7 @@ from starlette.concurrency import run_in_threadpool
 from app.data.demo_data import CHANGES, PUBLICATIONS, SOURCES
 from app.core.config import gemini_configuration
 from app.api.auth_routes import router as auth_router
-from app.db.models import User
+from app.db.models import User, MonitoredSource
 from app.services.auth import auth_configuration, get_current_user, get_optional_user, require_browser_request
 from app.db.models import ChangeFinding, DocumentComparison, DocumentVersion, Publication, RegulatoryAuthority
 from app.db.session import get_db, get_optional_db, resolve_database_url
@@ -30,6 +31,12 @@ from app.services.repository_comparison import (
     get_comparison_detail,
     get_document_comparison_summary,
     run_repository_comparison,
+)
+from app.services.source_monitor import (
+    RBI_NOTIFICATIONS_URL,
+    crawl_monitored_source,
+    validate_source_url,
+    _source_dict,
 )
 from app.services.document_ingestion import (
     MAX_UPLOAD_BYTES,
@@ -306,6 +313,145 @@ def update_finding_compliance_status(
 @router.get("/sources")
 def sources() -> dict:
     return {"items": SOURCES, "total": len(SOURCES)}
+
+
+@router.get("/source-monitors")
+def list_source_monitors(
+    session: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    items = session.scalars(
+        select(MonitoredSource)
+        .where(MonitoredSource.owner_user_id == user.id)
+        .order_by(MonitoredSource.created_at.desc())
+    ).all()
+    return {"items": [_source_dict(item) for item in items], "total": len(items)}
+
+
+@router.post("/source-monitors")
+def create_source_monitor(
+    payload: dict[str, Any],
+    request: Request,
+    session: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    require_browser_request(request)
+    url = str(payload.get("url") or "").strip()
+    try:
+        url = validate_source_url(url)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if len(url) > 2000:
+        raise HTTPException(status_code=422, detail="Source URL must be 2,000 characters or fewer.")
+    existing = session.scalar(
+        select(MonitoredSource).where(
+            MonitoredSource.owner_user_id == user.id,
+            MonitoredSource.url == url,
+        )
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="This source URL is already being monitored.")
+    source_kind = str(payload.get("source_kind") or "custom")
+    if source_kind not in {"custom", "rbi_notifications"}:
+        source_kind = "custom"
+    interval = payload.get("poll_interval_minutes", 60)
+    try:
+        interval = int(interval)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Polling interval must be a whole number of minutes.")
+    if interval < 15 or interval > 1440:
+        raise HTTPException(status_code=422, detail="Polling interval must be between 15 minutes and 24 hours.")
+    from urllib.parse import urlsplit
+    default_name = "RBI Notifications" if source_kind == "rbi_notifications" else (urlsplit(url).hostname or "Custom source")
+    source = MonitoredSource(
+        owner_user_id=user.id,
+        name=str(payload.get("name") or default_name).strip()[:240] or default_name,
+        url=url,
+        source_kind=source_kind,
+        enabled=True,
+        poll_interval_minutes=interval,
+    )
+    session.add(source)
+    session.commit()
+    session.refresh(source)
+    return _source_dict(source)
+
+
+@router.post("/source-monitors/{source_id}/crawl")
+def crawl_source_now(
+    source_id: str,
+    request: Request,
+    session: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    require_browser_request(request)
+    source = session.scalar(
+        select(MonitoredSource).where(
+            MonitoredSource.id == source_id,
+            MonitoredSource.owner_user_id == user.id,
+        )
+    )
+    if source is None:
+        raise HTTPException(status_code=404, detail="Monitored source was not found.")
+    result = crawl_monitored_source(session, source)
+    result["rbi_notifications_url"] = RBI_NOTIFICATIONS_URL if source.source_kind == "rbi_notifications" else None
+    return result
+
+
+@router.patch("/source-monitors/{source_id}")
+def update_source_monitor(
+    source_id: str,
+    payload: dict[str, Any],
+    request: Request,
+    session: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    require_browser_request(request)
+    source = session.scalar(
+        select(MonitoredSource).where(
+            MonitoredSource.id == source_id,
+            MonitoredSource.owner_user_id == user.id,
+        )
+    )
+    if source is None:
+        raise HTTPException(status_code=404, detail="Monitored source was not found.")
+    if "enabled" in payload:
+        source.enabled = bool(payload["enabled"])
+    if "poll_interval_minutes" in payload:
+        try:
+            interval = int(payload["poll_interval_minutes"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="Polling interval must be a whole number of minutes.")
+        if interval < 15 or interval > 1440:
+            raise HTTPException(status_code=422, detail="Polling interval must be between 15 minutes and 24 hours.")
+        source.poll_interval_minutes = interval
+    if "name" in payload:
+        source.name = str(payload["name"]).strip()[:240] or source.name
+    source.updated_at = datetime.now(timezone.utc)
+    session.commit()
+    session.refresh(source)
+    return _source_dict(source)
+
+
+@router.delete("/source-monitors/{source_id}")
+def delete_source_monitor(
+    source_id: str,
+    request: Request,
+    session: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict[str, bool]:
+    require_browser_request(request)
+    source = session.scalar(
+        select(MonitoredSource).where(
+            MonitoredSource.id == source_id,
+            MonitoredSource.owner_user_id == user.id,
+        )
+    )
+    if source is None:
+        raise HTTPException(status_code=404, detail="Monitored source was not found.")
+    session.delete(source)
+    session.commit()
+    return {"success": True}
 
 
 @router.post("/documents")
