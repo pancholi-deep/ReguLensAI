@@ -12,7 +12,8 @@ from app.services.auth import create_session_token
 client = TestClient(app, base_url="https://testserver")
 
 
-def test_l2_internal_repository_assessment_and_remediation_workflow():
+def test_l2_internal_repository_assessment_and_remediation_workflow(monkeypatch):
+    monkeypatch.setenv("SESSION_SECRET", "test-session-secret-that-is-at-least-32-characters")
     client.cookies.clear()
     factory = get_session_factory()
     assert factory is not None
@@ -38,7 +39,7 @@ def test_l2_internal_repository_assessment_and_remediation_workflow():
             evidence_verified=True,
         ))
         session.commit()
-        user_id, document_id = user.id, document.id
+        document_id = document.id
         token = create_session_token(user.id)
 
     client.cookies.set("regulens_session", token)
