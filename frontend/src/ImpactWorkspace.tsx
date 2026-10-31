@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { Activity, AlertCircle, CheckCircle2, ClipboardCheck, FileText, Plus, RefreshCw, Shield, Trash2 } from "lucide-react";
 import { api } from "./api";
 
