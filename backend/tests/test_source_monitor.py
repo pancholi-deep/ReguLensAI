@@ -174,5 +174,5 @@ def test_rbi_monitor_uses_notifications_rss_and_upgrades_existing_rows(monkeypat
 
 
 def test_rss_parser_prefers_document_enclosures():
-    feed = b\'''<?xml version="1.0"?><rss><channel><item><title>RBI circular</title><link>https://www.rbi.org.in/Scripts/NotificationUser.aspx?Id=12</link><enclosure url="https://rbidocs.rbi.org.in/circular.pdf" type="application/pdf" /></item></channel></rss>\'''
+    feed = b"""<?xml version="1.0"?><rss><channel><item><title>RBI circular</title><link>https://www.rbi.org.in/Scripts/NotificationUser.aspx?Id=12</link><enclosure url="https://rbidocs.rbi.org.in/circular.pdf" type="application/pdf" /></item></channel></rss>"""
     assert source_monitor._feed_items(feed) == [("RBI circular", "https://rbidocs.rbi.org.in/circular.pdf")]
