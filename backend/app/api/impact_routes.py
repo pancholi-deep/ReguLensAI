@@ -88,11 +88,19 @@ def _assessment_detail(session: Session, assessment: ImpactAssessment, owner_id:
             } if recommendation else None),
             "actions": [_action_dict(action) for action in actions],
         })
+    events = session.scalars(select(AssessmentEvent).where(
+        AssessmentEvent.assessment_id == assessment.id
+    ).order_by(AssessmentEvent.created_at.desc())).all()
     return {
         "id": assessment.id, "document_version_id": assessment.document_version_id,
         "status": assessment.status, "summary": assessment.summary,
         "created_at": assessment.created_at.isoformat() if assessment.created_at else None,
         "mappings": rows,
+        "events": [{
+            "id": event.id, "actor_user_id": event.actor_user_id,
+            "event_type": event.event_type, "details": event.details or {},
+            "created_at": event.created_at.isoformat() if event.created_at else None,
+        } for event in events],
         "counts": {key: sum(1 for row in rows if row["gap_status"] == key) for key in
                    ["addressed", "partially_addressed", "not_addressed", "unassessable"]},
     }
@@ -218,7 +226,7 @@ def run_impact_assessment(document_version_id: str, request: Request,
         )
         session.add(mapping)
         session.flush()
-        if status in {"partially_addressed", "not_addressed"}:
+        if status in {"partially_addressed", "not_addressed", "unassessable"}:
             recommendation = (
                 f"Review and update internal {best_asset.asset_type if best_asset else 'policy/control'} coverage for this obligation."
                 if best_asset else "Assign an accountable owner and create or update a policy/control to address this obligation."
@@ -227,7 +235,6 @@ def run_impact_assessment(document_version_id: str, request: Request,
             priority = "high" if status == "not_addressed" else "medium"
             session.add(Recommendation(impact_mapping_id=mapping.id, recommendation=recommendation,
                                        draft_wording=draft, priority=priority, status="pending_review"))
-    counts = {key: sum(1 for obligation in obligations for score, _ in ranked[:0]) for key in []}
     assessment.summary = (
         f"Assessed {len(obligations)} extracted obligations against {len(assets)} internal assets. "
         "Text matching is an initial triage signal; it does not establish legal or operational compliance."
