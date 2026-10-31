@@ -11,6 +11,7 @@ import GoogleSignInButton from "./GoogleSignInButton";
 
 type Page = "Dashboard" | "Documents";
 type DashboardFilter = "actions" | "documents" | "compliant";
+type FindingSeverity = "high" | "medium" | "low";
 type RiskTone = "red" | "yellow" | "green";
 
 function getSeverity(item: ChangeItem): "high" | "medium" | "low" {
@@ -56,6 +57,7 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [page, setPage] = useState<Page>("Dashboard");
   const [activeFilter, setActiveFilter] = useState<DashboardFilter>("actions");
+  const [severityFilter, setSeverityFilter] = useState<FindingSeverity | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [documentCount, setDocumentCount] = useState(0);
@@ -145,7 +147,16 @@ export default function App() {
   ).length;
   const needsReviewCount = openActions.length;
   const compliantFindings = findings.filter((item) => item.compliance_status === "compliant");
-  const visibleFindings = activeFilter === "compliant" ? compliantFindings : openActions;
+  const severityCounts: Record<FindingSeverity, number> = {
+    high: openActions.filter((item) => getSeverity(item) === "high").length,
+    medium: openActions.filter((item) => getSeverity(item) === "medium").length,
+    low: openActions.filter((item) => getSeverity(item) === "low").length,
+  };
+  const visibleFindings = activeFilter === "compliant"
+    ? compliantFindings
+    : severityFilter
+      ? openActions.filter((item) => getSeverity(item) === severityFilter)
+      : openActions;
 
   if (!authReady) {
     return <main className="login-screen"><div className="login-card"><div className="login-mark"><ShieldCheck size={25} /></div><strong>ReguLens<span>AI</span></strong><p>Checking your secure session…</p><div className="login-spinner" /></div></main>;
@@ -221,11 +232,11 @@ export default function App() {
 
           <section className="simple-metric-grid" aria-label="Dashboard filters">
             <Metric label="Documents uploaded" value={documentCount} caption="View saved documents" tone="blue" icon={FileText}
-              selected={activeFilter === "documents"} onClick={() => setActiveFilter("documents")} />
+              selected={activeFilter === "documents"} onClick={() => { setActiveFilter("documents"); setSeverityFilter(null); }} />
             <Metric label="Actions to review" value={needsReviewCount} caption="Open or in progress" tone="yellow" icon={Activity}
-              selected={activeFilter === "actions"} onClick={() => setActiveFilter("actions")} />
+              selected={activeFilter === "actions"} onClick={() => { setActiveFilter("actions"); setSeverityFilter(null); }} />
             <Metric label="Marked compliant" value={compliantCount} caption="Confirmed by your team" tone="green" icon={CheckCircle2}
-              selected={activeFilter === "compliant"} onClick={() => setActiveFilter("compliant")} />
+              selected={activeFilter === "compliant"} onClick={() => { setActiveFilter("compliant"); setSeverityFilter(null); }} />
           </section>
 
           <section className="simple-section dashboard-results">
@@ -236,6 +247,21 @@ export default function App() {
               </div>
               <span>{activeFilter === "documents" ? `${documentCount} documents` : `${visibleFindings.length} items`}</span>
             </div>
+            {activeFilter === "actions" && <div className="severity-filters" aria-label="Filter actions by severity">
+              <span>Severity</span>
+              {(["high", "medium", "low"] as FindingSeverity[]).map((severity) => (
+                <button
+                  type="button"
+                  key={severity}
+                  className={`severity-filter-button ${severity} ${severityFilter === severity ? "selected" : ""}`}
+                  aria-pressed={severityFilter === severity}
+                  onClick={() => setSeverityFilter((current) => current === severity ? null : severity)}
+                >
+                  {severity[0].toUpperCase() + severity.slice(1)}
+                  <span>{severityCounts[severity]}</span>
+                </button>
+              ))}
+            </div>}
             {activeFilter === "documents" ? (
               workspaceBusy ? <div className="simple-empty">Loading documents…</div>
                 : documents.length === 0 ? <div className="simple-empty"><FileText size={22} /><strong>No documents uploaded</strong><span>Upload a circular to build your repository.</span></div>
@@ -248,8 +274,8 @@ export default function App() {
               : visibleFindings.length === 0 ? (
                 <div className="simple-empty">
                   <ShieldCheck size={22} />
-                  <strong>{activeFilter === "compliant" ? "No items marked compliant" : "Nothing to review"}</strong>
-                  <span>{activeFilter === "actions" ? "Upload a circular to generate recommended actions." : "Your results will appear here when available."}</span>
+                  <strong>{activeFilter === "compliant" ? "No items marked compliant" : severityFilter ? `No ${severityFilter} severity findings` : "Nothing to review"}</strong>
+                  <span>{activeFilter === "actions" ? (severityFilter ? "Try another severity filter or clear the selected filter." : "Upload a circular to generate recommended actions.") : "Your results will appear here when available."}</span>
                 </div>
               ) : <div className="simple-action-list">{visibleFindings.slice().sort((a, b) => {
                   const rank = (item: ChangeItem) => item.compliance_status === "compliant" ? 3 : getRiskTone(item) === "red" ? 0 : 1;
