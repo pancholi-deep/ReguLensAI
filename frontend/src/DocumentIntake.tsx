@@ -194,22 +194,15 @@ export default function DocumentIntake({ analysis, onAnalyzed }: DocumentIntakeP
       <div className="result-summary"><Sparkles size={16} /><p>{analysis.extraction.summary}</p></div>
       {analysis.comparison ? (
         <div ref={comparisonResultsRef} className="detail-section comparison-results">
-          <h3><Activity size={16} /> Repository-wide historical comparison</h3>
-          <div className="obligation-tags">
-            <span>Status: {analysis.comparison.status.replace(/_/g, " ")}</span>
-            <span>Documents evaluated: {analysis.comparison.documents_considered ?? "—"}</span>
-            <span>Documents matched: {analysis.comparison.documents_matched}</span>
-            <span>Findings: {analysis.comparison.finding_count ?? 0}</span>
+          <h3><Activity size={16} /> Historical comparison</h3>
+          <div className="history-summary">
+            <span className="pill neutral">{analysis.comparison.status === "compared" ? "Compared" : analysis.comparison.status === "no_history" ? "No history" : analysis.comparison.status === "no_relevant_match" ? "No match" : analysis.comparison.status.replace(/_/g, " ")}</span>
+            <span>{analysis.comparison.documents_matched} matched · {analysis.comparison.finding_count ?? 0} findings</span>
+            {analysis.comparison.status === "no_relevant_match" && <span>{analysis.comparison.documents_considered ?? 0} documents scanned</span>}
           </div>
-          <p>
-            {analysis.comparison.status === "no_history"
-              ? "No saved historical documents were available. Upload the earlier circular first; synthetic dashboard examples do not count as saved historical documents."
-              : analysis.comparison.status === "no_relevant_match"
-                ? `Evaluated ${analysis.comparison.documents_considered ?? 0} saved historical documents, but none matched closely enough. Check that the earlier circular appears under Saved documents and that its reference number and jurisdiction were extracted.`
-                : analysis.comparison.status === "failed"
-                  ? (analysis.comparison.message ?? "Document intelligence was saved, but repository comparison failed. Check the backend logs.")
-                  : `Evaluated ${analysis.comparison.documents_considered ?? "saved"} historical documents and matched ${analysis.comparison.documents_matched} candidate document(s). ${analysis.comparison.finding_count ?? 0} change finding(s) were recorded.`}
-          </p>
+          {analysis.comparison.status === "no_history" && <p>No earlier documents in this repository yet.</p>}
+          {analysis.comparison.status === "no_relevant_match" && <p>No related historical document was found.</p>}
+          {analysis.comparison.status === "failed" && <p>{analysis.comparison.message ?? "Comparison failed. Try again or check the API logs."}</p>}
           {(analysis.comparison.comparisons ?? []).map((comparison) => (
             <article className="obligation-card" key={comparison.id}>
               <div className="obligation-top">
@@ -223,7 +216,9 @@ export default function DocumentIntake({ analysis, onAnalyzed }: DocumentIntakeP
                 <span>Analysis: {comparison.analysis_method}</span>
               </div>
               <p>{comparison.summary}</p>
-              {comparison.findings.map((finding) => (
+              {comparison.findings.length > 0 && <details className="historical-findings">
+                <summary>View {comparison.findings.length} clause findings</summary>
+                {comparison.findings.map((finding) => (
                 <div className="change-finding" key={finding.id}>
                   <div className="obligation-top">
                     <span>{finding.previous_clause_number || finding.updated_clause_number
@@ -262,7 +257,8 @@ export default function DocumentIntake({ analysis, onAnalyzed }: DocumentIntakeP
                   </div>
                 </div>
               ))}
-              {comparison.findings.length === 0 && <p className="muted">No material findings were produced for this matched document.</p>}
+              </details>}
+              {comparison.findings.length === 0 && <p className="muted">No material findings for this document.</p>}
             </article>
           ))}
         </div>
