@@ -354,6 +354,8 @@ def create_source_monitor(
     source_kind = str(payload.get("source_kind") or "custom")
     if source_kind not in {"custom", "rbi_notifications"}:
         source_kind = "custom"
+    if source_kind == "rbi_notifications" and url != RBI_NOTIFICATIONS_URL:
+        raise HTTPException(status_code=422, detail="RBI monitoring must use the official RBI Notifications URL.")
     interval = payload.get("poll_interval_minutes", 60)
     try:
         interval = int(interval)
@@ -416,7 +418,9 @@ def update_source_monitor(
     if source is None:
         raise HTTPException(status_code=404, detail="Monitored source was not found.")
     if "enabled" in payload:
-        source.enabled = bool(payload["enabled"])
+        if not isinstance(payload["enabled"], bool):
+            raise HTTPException(status_code=422, detail="Enabled must be true or false.")
+        source.enabled = payload["enabled"]
     if "poll_interval_minutes" in payload:
         try:
             interval = int(payload["poll_interval_minutes"])
