@@ -47,7 +47,11 @@ export default function SourceMonitor({ onCrawlComplete }: { onCrawlComplete: ()
     try {
       const result: SourceCrawlResult = await api.crawlSourceMonitor(source.id);
       setItems(current => current.map(item => item.id === source.id ? result : item));
-      setNotice("Check complete: " + result.documents_ingested + " new or updated document(s) ingested; " + result.duplicates_skipped + " duplicate(s) skipped.");
+      if (result.last_error) {
+        setError(result.last_error);
+      } else {
+        setNotice("Check complete: " + result.documents_ingested + " new or updated document(s) ingested; " + result.duplicates_skipped + " duplicate(s) skipped.");
+      }
       if (result.documents_ingested > 0) onCrawlComplete();
     } catch (e) { setError(e instanceof Error ? e.message : "Source check failed."); }
     finally { setBusyId(""); }
