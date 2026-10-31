@@ -380,3 +380,54 @@ td small { color: #75849a; font-size: 12.5px; }
 
 .simple-shell .sidebar-toggle-top { margin-left: -7px; color: #6e7f93; }
 .simple-shell .sidebar-toggle-top:hover { background: #edf3f8; }
+
+
+/* Dashboard metric tiles are interactive filters. */
+.simple-metric {
+  display: block;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.simple-metric:hover {
+  border-color: #b9cde0;
+  box-shadow: 0 4px 14px rgba(38, 75, 112, .08);
+  transform: translateY(-1px);
+}
+.simple-metric.selected {
+  border-color: #5e91bd;
+  box-shadow: inset 0 0 0 1px #5e91bd, 0 3px 10px rgba(38, 75, 112, .07);
+}
+.simple-metric:focus-visible {
+  outline: 3px solid rgba(79, 139, 190, .28);
+  outline-offset: 2px;
+}
+
+
+.history-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 10px 0 12px;
+  color: #7c899c;
+  font-size: 12px;
+}
+.historical-findings {
+  margin-top: 12px;
+  border-top: 1px solid #edf0f4;
+  padding-top: 10px;
+}
+.historical-findings > summary {
+  width: fit-content;
+  color: #456b8e;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+.historical-findings[open] > summary {
+  margin-bottom: 12px;
+}
