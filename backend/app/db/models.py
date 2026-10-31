@@ -266,3 +266,28 @@ class ChangeFinding(Base):
     needs_review: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     compliance_status: Mapped[str] = mapped_column(String(24), default="open", server_default="open", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+
+class MonitoredSource(Base):
+    __tablename__ = "monitored_sources"
+    __table_args__ = (
+        UniqueConstraint("owner_user_id", "url", name="uq_monitored_sources_owner_url"),
+        Index("ix_monitored_sources_owner_enabled", "owner_user_id", "enabled"),
+        Index("ix_monitored_sources_enabled", "enabled"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(240), nullable=False)
+    url: Mapped[str] = mapped_column(String(2000), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(40), nullable=False, default="custom")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    poll_interval_minutes: Mapped[int] = mapped_column(Integer, default=60, nullable=False)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    known_items: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    last_changes: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
