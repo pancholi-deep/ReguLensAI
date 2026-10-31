@@ -3,7 +3,7 @@ import { AlertTriangle, Clock3, ExternalLink, Globe, Pause, Play, Plus, RefreshC
 import { api } from "./api";
 import type { MonitoredSource, SourceCrawlResult } from "./types";
 
-const RBI_URL = "https://www.rbi.org.in/Scripts/NotificationUser.aspx";
+const RBI_URL = "https://www.rbi.org.in/notifications_rss.xml";
 
 function formatDate(value: string | null): string {
   if (!value) return "Not yet checked";
