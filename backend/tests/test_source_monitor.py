@@ -17,7 +17,7 @@ client = TestClient(app, base_url="https://testserver")
 
 
 def test_validate_source_url_rejects_unsafe_targets(monkeypatch):
-    monkeypatch.setattr(source_monitor, "_assert_public_host", lambda host: None)
+    monkeypatch.setattr(source_monitor, "_assert_public_host", lambda host: (_ for _ in ()).throw(ValueError("Private address is not allowed.")) if host == "127.0.0.1" else None)
     assert source_monitor.validate_source_url("https://example.org/notices?year=2026") == "https://example.org/notices?year=2026"
     with pytest.raises(ValueError):
         source_monitor.validate_source_url("file:///etc/passwd")
@@ -86,6 +86,7 @@ def test_source_monitor_api_is_scoped_to_signed_in_user(monkeypatch):
 
 
 def test_crawler_detects_new_and_changed_document_bytes(monkeypatch):
+    monkeypatch.setattr(source_monitor, "_assert_public_host", lambda host: None)
     factory = get_session_factory()
     assert factory is not None
     with factory() as session:
