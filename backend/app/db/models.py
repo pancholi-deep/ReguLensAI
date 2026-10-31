@@ -291,3 +291,105 @@ class MonitoredSource(Base):
     last_changes: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class InternalAsset(Base):
+    """User-owned policy, procedure, control, system or process evidence."""
+    __tablename__ = "internal_assets"
+    __table_args__ = (
+        Index("ix_internal_assets_owner_type", "owner_user_id", "asset_type"),
+        Index("ix_internal_assets_owner_department", "owner_user_id", "department"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    asset_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    name: Mapped[str] = mapped_column(String(300), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    department: Mapped[str | None] = mapped_column(String(160))
+    owner_name: Mapped[str | None] = mapped_column(String(240))
+    system_name: Mapped[str | None] = mapped_column(String(240))
+    criticality: Mapped[str] = mapped_column(String(24), nullable=False, default="medium")
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class ImpactAssessment(Base):
+    __tablename__ = "impact_assessments"
+    __table_args__ = (Index("ix_impact_assessments_owner_created", "owner_user_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    document_version_id: Mapped[str] = mapped_column(ForeignKey("document_versions.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="completed")
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class ImpactMapping(Base):
+    __tablename__ = "impact_mappings"
+    __table_args__ = (
+        UniqueConstraint("assessment_id", "obligation_id", "internal_asset_id", name="uq_impact_mapping_pair"),
+        Index("ix_impact_mappings_assessment_status", "assessment_id", "gap_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    assessment_id: Mapped[str] = mapped_column(ForeignKey("impact_assessments.id", ondelete="CASCADE"), nullable=False)
+    obligation_id: Mapped[str] = mapped_column(ForeignKey("obligations.id", ondelete="CASCADE"), nullable=False)
+    internal_asset_id: Mapped[str | None] = mapped_column(ForeignKey("internal_assets.id", ondelete="SET NULL"))
+    gap_status: Mapped[str] = mapped_column(String(32), nullable=False, default="not_addressed")
+    match_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    evidence: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    reviewed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class Recommendation(Base):
+    __tablename__ = "recommendations"
+    __table_args__ = (Index("ix_recommendations_mapping", "impact_mapping_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    impact_mapping_id: Mapped[str] = mapped_column(ForeignKey("impact_mappings.id", ondelete="CASCADE"), nullable=False)
+    recommendation: Mapped[str] = mapped_column(Text, nullable=False)
+    draft_wording: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending_review")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class RemediationAction(Base):
+    __tablename__ = "remediation_actions"
+    __table_args__ = (
+        Index("ix_remediation_actions_owner_status", "owner_user_id", "status"),
+        Index("ix_remediation_actions_assessment", "assessment_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    assessment_id: Mapped[str] = mapped_column(ForeignKey("impact_assessments.id", ondelete="CASCADE"), nullable=False)
+    impact_mapping_id: Mapped[str] = mapped_column(ForeignKey("impact_mappings.id", ondelete="CASCADE"), nullable=False)
+    recommendation_id: Mapped[str | None] = mapped_column(ForeignKey("recommendations.id", ondelete="SET NULL"))
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    owner_name: Mapped[str | None] = mapped_column(String(240))
+    department: Mapped[str | None] = mapped_column(String(160))
+    due_date: Mapped[date | None] = mapped_column(Date)
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="open")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class AssessmentEvent(Base):
+    __tablename__ = "assessment_events"
+    __table_args__ = (Index("ix_assessment_events_assessment", "assessment_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    assessment_id: Mapped[str] = mapped_column(ForeignKey("impact_assessments.id", ondelete="CASCADE"), nullable=False)
+    actor_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    details: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
