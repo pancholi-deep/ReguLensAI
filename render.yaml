@@ -25,7 +25,7 @@ services:
       - key: SESSION_SECRET
         sync: false
       - key: SOURCE_CRAWLER_ENABLED
-        value: true
+        value: "true"
 
   - type: web
     name: regulens-ai-frontend
