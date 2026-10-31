@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity, AlertTriangle, CheckCircle2, ChevronRight, FileText, Globe,
-  LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, RefreshCw,
+  Activity, AlertTriangle, Building2, CheckCircle2, ChevronRight, ClipboardCheck, FileText, Globe,
+  LayoutDashboard, ListTodo, LogOut, PanelLeftClose, PanelLeftOpen, RefreshCw,
   ShieldCheck, UploadCloud, type LucideIcon,
 } from "lucide-react";
 import { api, type AuthUser } from "./api";
@@ -9,8 +9,9 @@ import type { ChangeItem, DocumentAnalysis, DocumentRecord } from "./types";
 import DocumentIntake from "./DocumentIntake";
 import GoogleSignInButton from "./GoogleSignInButton";
 import SourceMonitor from "./SourceMonitor";
+import ImpactWorkspace from "./ImpactWorkspace";
 
-type Page = "Dashboard" | "Documents" | "Sources";
+type Page = "Dashboard" | "Documents" | "Sources" | "Internal Repository" | "Impact Assessments" | "Actions";
 type DashboardFilter = "actions" | "documents" | "compliant";
 type FindingSeverity = "high" | "medium" | "low";
 type RiskTone = "red" | "yellow" | "green";
@@ -198,6 +199,18 @@ export default function App() {
           <Globe size={18} />{!sidebarCollapsed && <span>Sources</span>}
           {page === "Sources" && !sidebarCollapsed && <ChevronRight size={15} className="nav-chevron" />}
         </button>
+        <button className={"nav-item " + (page === "Internal Repository" ? "active" : "")} onClick={() => setPage("Internal Repository")} title={sidebarCollapsed ? "Internal Repository" : undefined}>
+          <Building2 size={18} />{!sidebarCollapsed && <span>Internal Repository</span>}
+          {page === "Internal Repository" && !sidebarCollapsed && <ChevronRight size={15} className="nav-chevron" />}
+        </button>
+        <button className={"nav-item " + (page === "Impact Assessments" ? "active" : "")} onClick={() => setPage("Impact Assessments")} title={sidebarCollapsed ? "Impact Assessments" : undefined}>
+          <ClipboardCheck size={18} />{!sidebarCollapsed && <span>Impact Assessments</span>}
+          {page === "Impact Assessments" && !sidebarCollapsed && <ChevronRight size={15} className="nav-chevron" />}
+        </button>
+        <button className={"nav-item " + (page === "Actions" ? "active" : "")} onClick={() => setPage("Actions")} title={sidebarCollapsed ? "Actions" : undefined}>
+          <ListTodo size={18} />{!sidebarCollapsed && <span>Actions</span>}
+          {page === "Actions" && !sidebarCollapsed && <ChevronRight size={15} className="nav-chevron" />}
+        </button>
       </nav>
       <div className="sidebar-bottom simple-sidebar-bottom">
         <div className="user-row">
@@ -309,6 +322,9 @@ export default function App() {
         </>}
 
         {page === "Sources" && <SourceMonitor onCrawlComplete={() => void loadWorkspace(false)} />}
+        {page === "Internal Repository" && <ImpactWorkspace mode="repository" />}
+        {page === "Impact Assessments" && <ImpactWorkspace mode="assessments" />}
+        {page === "Actions" && <ImpactWorkspace mode="actions" />}
 
         {page === "Documents" && <>
           <div className="simple-page-heading">
