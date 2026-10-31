@@ -26,7 +26,8 @@ from app.services.repository_comparison import run_repository_comparison
 
 logger = logging.getLogger(__name__)
 
-RBI_NOTIFICATIONS_URL = "https://www.rbi.org.in/Scripts/NotificationUser.aspx"
+RBI_NOTIFICATIONS_URL = "https://www.rbi.org.in/notifications_rss.xml"
+RBI_NOTIFICATIONS_PAGE_URL = "https://www.rbi.org.in/Scripts/NotificationUser.aspx"
 MAX_PAGE_BYTES = 3 * 1024 * 1024
 MAX_DOCUMENTS_PER_CRAWL = 12
 MAX_DETAIL_PAGES_PER_CRAWL = 20
@@ -151,14 +152,22 @@ def _feed_items(body: bytes) -> list[tuple[str, str]]:
             continue
         title = ""
         link = ""
+        enclosure = ""
         for child in list(element):
             name = _local_name(child.tag)
             if name == "title":
                 title = " ".join("".join(child.itertext()).split())
             elif name == "link":
-                link = child.attrib.get("href") or (child.text or "").strip()
-        if title and link:
-            items.append((title, link))
+                candidate = child.attrib.get("href") or (child.text or "").strip()
+                if child.attrib.get("rel", "").lower() == "enclosure":
+                    enclosure = candidate
+                elif candidate and not link:
+                    link = candidate
+            elif name == "enclosure" or name == "content":
+                enclosure = child.attrib.get("url") or enclosure
+        selected_link = enclosure or link
+        if title and selected_link:
+            items.append((title, selected_link))
     return items
 
 
@@ -228,11 +237,13 @@ def _discover_document_links(
             elif _is_detail_url(absolute):
                 detail_pages.append((title or absolute, absolute))
 
+    failed_detail_pages: list[str] = []
     for title, detail_url in detail_pages[:MAX_DETAIL_PAGES_PER_CRAWL]:
         try:
             detail_body, detail_type, final_url, _ = _safe_get(detail_url)
         except (SourceFetchError, ValueError) as exc:
             logger.info("Skipping source detail page %s: %s", detail_url, exc)
+            failed_detail_pages.append(str(exc))
             continue
         if "html" not in detail_type.lower() and not detail_type.lower().startswith("text/"):
             if _is_document_url(final_url):
@@ -242,6 +253,12 @@ def _discover_document_links(
             absolute = urljoin(final_url, href)
             if _is_document_url(absolute):
                 discovered.append((title or label or PurePosixPath(urlsplit(absolute).path).name, absolute))
+
+    if detail_pages and not discovered and failed_detail_pages:
+        raise SourceFetchError(
+            f"The listing/feed was readable, but linked notification pages were blocked or unavailable. "
+            f"First failure: {failed_detail_pages[0]}"
+        )
 
     unique: dict[str, tuple[str, str]] = {}
     for title, url in discovered:
@@ -272,12 +289,32 @@ def crawl_monitored_source(session: Session, source: MonitoredSource) -> dict[st
     source.last_error = None
     changes: list[dict[str, Any]] = []
     try:
-        safe_url = validate_source_url(source.url)
+        safe_url = source.url
+        if source.source_kind == "rbi_notifications":
+            # RBI documents its notifications RSS endpoint for automated update readers.
+            # Upgrade rows created with the HTML listing URL so existing monitors recover.
+            if source.url != RBI_NOTIFICATIONS_URL:
+                duplicate = session.scalar(
+                    select(MonitoredSource).where(
+                        MonitoredSource.owner_user_id == source.owner_user_id,
+                        MonitoredSource.url == RBI_NOTIFICATIONS_URL,
+                        MonitoredSource.id != source.id,
+                    )
+                )
+                if duplicate is not None:
+                    raise SourceFetchError(
+                        "An RBI Notifications RSS monitor already exists. Remove the duplicate source and retry."
+                    )
+                source.url = RBI_NOTIFICATIONS_URL
+                source.updated_at = now
+            safe_url = RBI_NOTIFICATIONS_URL
+        safe_url = validate_source_url(safe_url)
         root_body, content_type, final_url, headers = _safe_get(safe_url)
         candidates = _discover_document_links(final_url, root_body, content_type)
         known_items = dict(source.known_items or {})
         processed = 0
         duplicates = 0
+        download_errors: list[str] = []
 
         for title, document_url in candidates:
             try:
@@ -286,6 +323,7 @@ def crawl_monitored_source(session: Session, source: MonitoredSource) -> dict[st
                 )
             except (SourceFetchError, ValueError) as exc:
                 logger.warning("Unable to fetch document from %s: %s", document_url, exc)
+                download_errors.append(str(exc))
                 continue
 
             filename = _filename_from_response(final_document_url, document_headers)
@@ -351,7 +389,10 @@ def crawl_monitored_source(session: Session, source: MonitoredSource) -> dict[st
         source.known_items = dict(list(known_items.items())[-1000:])
         source.last_changes = changes[:50]
         source.last_success_at = now
-        source.last_error = None
+        source.last_error = (
+            f"{len(download_errors)} linked document(s) could not be downloaded. First failure: {download_errors[0]}"
+            if download_errors else None
+        )
         session.commit()
         return {
             **_source_dict(source),
