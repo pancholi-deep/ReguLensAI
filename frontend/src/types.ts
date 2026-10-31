@@ -158,3 +158,8 @@ export interface DocumentAnalysis {
     note: string;
   };
 }
+
+
+export interface MonitoredSourceChange { title: string; url: string; status: string; document_version_id: string; finding_count: number; detected_at: string; }
+export interface MonitoredSource { id: string; name: string; url: string; source_kind: 'rbi_notifications' | 'custom'; enabled: boolean; poll_interval_minutes: number; last_checked_at: string | null; last_success_at: string | null; last_error: string | null; last_changes: MonitoredSourceChange[]; created_at: string | null; }
+export interface SourceCrawlResult extends MonitoredSource { documents_discovered: number; documents_ingested: number; duplicates_skipped: number; changes: MonitoredSourceChange[]; }
